@@ -7,21 +7,25 @@ export class MedusaCloudEmailNotificationProvider extends AbstractNotificationPr
   protected options_: MedusaCloudEmailOptions
   protected logger_: Logger
 
-  constructor({}, options: MedusaCloudEmailOptions) {
+  constructor({ logger }: { logger: Logger }, options: MedusaCloudEmailOptions) {
     super()
 
+    this.logger_ = logger
     this.options_ = options
   }
 
   async send(
     notification: NotificationTypes.ProviderSendNotificationDTO
   ): Promise<NotificationTypes.ProviderSendNotificationResultsDTO> {
+    let response: Response
     try {
-      const response = await fetch(`${this.options_.endpoint}/send`, {
+      response = await fetch(`${this.options_.endpoint}/send`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Basic ${this.options_.api_key}`,
+          Authorization: `Basic ${Buffer.from(
+            `api_key:${this.options_.api_key}`
+          ).toString("base64")}`,
           "x-medusa-environment-handle": this.options_.environment_handle,
         },
         body: JSON.stringify({
@@ -33,17 +37,26 @@ export class MedusaCloudEmailNotificationProvider extends AbstractNotificationPr
           content: notification.content,
         }),
       })
-      const responseBody = await response.json()
-
-      if (!response.ok) {
-        throw new Error(
-          `Failed to send email: ${response.status} - ${response.statusText}: ${responseBody.message}`
-        )
-      }
-
-      return { id: responseBody.id }
     } catch (error) {
+      this.logger_?.error(`Failed to send email: ${error.message}`)
       throw new Error(`Failed to send email: ${error.message}`)
     }
+
+    let responseBody
+    try {
+      responseBody = await response.json()
+    } catch (parseError) {
+      const message = `Failed to send email: ${response.status} - ${response.statusText}: Could not parse response body`
+      this.logger_?.error(message)
+      throw new Error(message)
+    }
+
+    if (!response.ok) {
+      const message = `Failed to send email: ${response.status} - ${response.statusText}: ${responseBody.message}`
+      this.logger_?.error(message)
+      throw new Error(message)
+    }
+
+    return { id: responseBody.id }
   }
 }

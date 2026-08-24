@@ -66,6 +66,12 @@ export default async ({
     }
   }
 
+  // NOTE: We intentionally pass the original options?.providers list (without the
+  // synthetic cloud provider) to moduleProviderLoader, because the cloud provider
+  // entry has resolve: "" which would break dynamicImport. The full providers list
+  // (with cloud provider), stored above as `providers`, is only passed to
+  // syncDatabaseProviders for database sync. Do not change this to use the
+  // `providers` variable here, as it would cause crashes.
   await moduleProviderLoader({
     container,
     providers: options?.providers || [],
